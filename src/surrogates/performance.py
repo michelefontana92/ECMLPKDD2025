@@ -1,7 +1,6 @@
 from .surrogate_factory import register_surrogate
 from torch.nn import CrossEntropyLoss
-from functools import partial
-import torch
+
 @register_surrogate('performance')
 class PerformanceSurrogate:
     def __init__(self,**kwargs) -> None:

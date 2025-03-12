@@ -1,7 +1,6 @@
 from .base_surrogate import BaseSurrogate
-from .demographic_parity import WassersteinDemographicParitySurrogate
 import torch 
-from torch.nn.functional import relu
+
 
 class SurrogateFunctionSet:
     def __init__(self, surrogates: list[BaseSurrogate],**kwargs) -> None:

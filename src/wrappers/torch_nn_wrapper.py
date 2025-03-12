@@ -4,18 +4,14 @@
 from wrappers.base_wrapper import BaseWrapper
 import torch 
 import tqdm
-import numpy as np
 from loggers import BaseLogger
 from callbacks import EarlyStopping, ModelCheckpoint
 from dataloaders import DataModule
-from loggers import WandbLogger,BaseLogger,FileLogger
+from loggers import BaseLogger
 from dataloaders import DataModule
 from metrics import BaseMetric,Performance,GroupFairnessMetric
 import tqdm
-from sklearn.metrics import f1_score, classification_report,confusion_matrix
-from torchmetrics import ConfusionMatrix,F1Score
-import functools
-from metrics import MetricsFactory
+
 class EarlyStoppingException(Exception):
     pass
 

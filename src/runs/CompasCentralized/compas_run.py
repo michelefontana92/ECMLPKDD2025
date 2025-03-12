@@ -18,8 +18,8 @@ class CentralizedCompasRun(BaseRun):
                                                 'dropout': self.dropout,
                                                 'output': self.output})
         self.dataset = 'compas'
-        self.data_root  = 'data/Centralized_Compas'
-        self.clean_data_path = 'data/Centralized_Compas/compas_clean.csv'
+        self.data_root  = '../data/Centralized_Compas'
+        self.clean_data_path = '../data/Centralized_Compas/compas_clean.csv'
         self.sensitive_attributes = kwargs.get('sensitive_attributes',
                                                [
                                                 ('Race',

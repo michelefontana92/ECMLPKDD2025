@@ -1,5 +1,5 @@
-from hard_label_estimator.metrics.fairness import *
-from hard_label_estimator.estimator import HardLabelsEstimator
+from .soft_confusion_matrix.fairness import *
+from .soft_confusion_matrix.performance import *
 from .surrogate_factory import register_surrogate
 
 

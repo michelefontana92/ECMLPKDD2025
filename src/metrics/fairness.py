@@ -1,9 +1,8 @@
 from torchmetrics import StatScores
 import torch 
-from abc import ABC, abstractmethod
 from .metrics_factory import register_metric
 from .base_metric import BaseMetric
-from surrogates import SurrogateFactory,WassersteinDemographicParitySurrogate,WassersteinEqualOpportunitySurrogate,WassersteinEqualizedOddsSurrogate
+from surrogates import SurrogateFactory
 
 @register_metric('statistic_scores')
 class StatisticScores(BaseMetric):
@@ -132,12 +131,7 @@ class DemographicParity(GroupFairnessMetric):
         for current_class in range(self.num_classes):
             self.stats_per_class_group_diff[current_class] = []
 
-        self.wasserstein_distance:WassersteinDemographicParitySurrogate = SurrogateFactory.create(
-                                                              'wasserstein_demographic_parity',
-                                                               group_name=self.group_name,
-                                                               unique_group_ids=self.group_ids,
-                                                               reduction='mean',
-                                                               weight=1)
+        
     
        
     def get(self):
@@ -186,15 +180,6 @@ class DemographicParity(GroupFairnessMetric):
         for current_class in range(self.num_classes):
             self.stats_per_class_group_diff[current_class] = []
     
-    def compute_wasserstein_distance(self,logits,labels,group_ids,**kwargs):
-        distance = self.wasserstein_distance(logits=logits,
-                                             labels=labels,
-                                             group_ids=group_ids,
-                                             **kwargs)
-        return {f'wasserstein_distance_demographic_parity_{self.group_name}':
-                distance
-                }
-    
 @register_metric('equal_opportunity')
 class EqualOpportunity(GroupFairnessMetric):
     def __init__(self, **kwargs):
@@ -204,12 +189,7 @@ class EqualOpportunity(GroupFairnessMetric):
         self.metrics_per_class = []
         for current_class in range(self.num_classes):
             self.stats_per_class_group_diff[current_class] = []
-        self.wasserstein_distance:WassersteinEqualOpportunitySurrogate = SurrogateFactory.create(
-                                                              'wasserstein_equal_opportunity',
-                                                               group_name=self.group_name,
-                                                               unique_group_ids=self.group_ids,
-                                                               reduction='mean',
-                                                               weight=1)
+
     def get(self):
         if not self.use_multiclass: 
             group_ids = list(self.stats_per_group.keys())
@@ -246,14 +226,7 @@ class EqualOpportunity(GroupFairnessMetric):
         for current_class in range(self.num_classes):
             self.stats_per_class_group_diff[current_class] = []
     
-    def compute_wasserstein_distance(self,logits,labels,group_ids,**kwargs):
-        distance:WassersteinEqualOpportunitySurrogate = self.wasserstein_distance(logits=logits,
-                                             labels=labels,
-                                             group_ids=group_ids,
-                                             **kwargs)
-        return {f'wasserstein_distance_equal_opportunity_{self.group_name}':
-                distance
-                }
+    
     
 @register_metric('equalized_odds')
 class EqualizedOdds(GroupFairnessMetric):
@@ -267,12 +240,7 @@ class EqualizedOdds(GroupFairnessMetric):
         for current_class in range(self.num_classes):
             self.stats_per_class_group_diff_tpr[current_class] = []
             self.stats_per_class_group_diff_fpr[current_class] = []
-        self.wasserstein_distance:WassersteinEqualizedOddsSurrogate = SurrogateFactory.create(
-                                                              'wasserstein_equalized_odds',
-                                                               group_name=self.group_name,
-                                                               unique_group_ids=self.group_ids,
-                                                               reduction='mean',
-                                                               weight=1)
+       
     def get(self):
         if not self.use_multiclass:
             group_ids = list(self.stats_per_group.keys()) 
@@ -314,53 +282,4 @@ class EqualizedOdds(GroupFairnessMetric):
         for current_class in range(self.num_classes):
             self.stats_per_class_group_diff_tpr[current_class] = []
             self.stats_per_class_group_diff_fpr[current_class] = []
-    def compute_wasserstein_distance(self,logits,labels,group_ids,**kwargs):
-        distance:WassersteinEqualizedOddsSurrogate = self.wasserstein_distance(logits=logits,
-                                             labels=labels,
-                                             group_ids=group_ids,
-                                             **kwargs)
-        return {f'wasserstein_distance_equalized_odds_{self.group_name}':
-                distance
-                }
-
-@register_metric('wasserstein_distance')
-class WassersteinDistance(BaseMetric):
-    def __init__(self, **kwargs):
-        group_ids = kwargs.get('group_ids')
-        self.group_name = kwargs.get('group_name')
-        self.metric_name = kwargs.get('metric_name')
-        assert isinstance(group_ids, dict), "group_ids must be a dictionary"
-        assert len(group_ids[self.group_name]) > 1, "group_ids must have at least 2 groups"
-
-        _REDUCTION_TYPES = {
-            'min': torch.min, 
-            'mean': torch.mean, 
-            'max': torch.max
-        }
-
-        self._reduction = _REDUCTION_TYPES.get(kwargs.get('reduction','mean'))
-        self.distances_per_group = []
-          
-    def get(self): 
-        group_ids = list(self.stats_per_group.keys())
-        for i in range(len(group_ids)):
-            for j in range(i+1,len(group_ids)):
-                self.stats_per_group_diff.append(abs(self.stats_per_group[group_ids[i]].get()['tpr'] - self.stats_per_group[group_ids[j]].get()['tpr']))
     
-        return {f'wasserstein_distance_{self.group_name}':
-                self._reduction(
-                    torch.tensor(self.stats_per_group_diff))
-        }
-    
-    def calculate(self, probabilities, labels, group_ids:dict):
-        current_group_ids:list = group_ids[self.group_name]
-        assert len(probabilities) == len(labels) == len(current_group_ids), "y_pred, y_true and group_ids must have the same length"
-        for group_id in torch.unique(current_group_ids):
-            if group_id != -1:
-                y_pred_group = y_pred[current_group_ids==group_id.item()]
-                y_true_group = y_true[current_group_ids==group_id.item()]
-                self.stats_per_group[group_id.item()]= wasserstein_distance_threshold(y_pred_group, y_true_group)
-    
-    def reset(self):
-        super().reset()
-        self.distances_per_group = []
