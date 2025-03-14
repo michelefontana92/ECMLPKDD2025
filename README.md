@@ -1,6 +1,9 @@
-# FairLab
+# FairLAB
+<p align="center">
+<img src="method.jpg" alt="Method sketch" width="600">
+</p>
 
-`FairLab` is a methodology that...
+`FairLAB` (Fairness via Lagrangian Augmented with a performance Budget) is a a method for training *fair* and *high-performing* neural networks under both group and intersectional fairness constraints, exploiting Augmented Lagrangian Method. With its tunable *performance budget*, which provides explicit control to the trade-off between fairness and performance, `FairLAB` is flexible and adaptive. In addition, by employing a divide-et-impera strategy for decomposing the fairness problem, `FairLAB` is scalable, particularly effective in intersectional fairness settings, where multiple sensitive attributes interact.
 
 ---
 
@@ -117,7 +120,7 @@ We plan to allow users to choose other logging systems in the future.
 ## **Examples**
 
 ### **1. One Fairness Constraint**
-Create a federation with 10 clients enforcing **Demographic Parity (DP ≤ 0.20) on GenderRace** using the **Compas** dataset, with a performance budget of 0.05 and a delta of 0.02.
+Create an experiment enforcing **Demographic Parity (DP ≤ 0.20) on GenderRace** using the **Compas** dataset, with a performance budget of 0.05 and a delta of 0.02.
 ```bash
 python main.py -r compas_fairlab -ml demographic_parity -tl 0.20 -gl GenderRace -p Compas_GenderRace -pb 0.05 -d 0.02
 ```

@@ -22,7 +22,9 @@ env/                     # Altri nomi comuni per virtual environment
 
 # Jupyter Notebook
 .ipynb_checkpoints/      # Checkpoints dei notebook Jupyter
-
+*.jpg                    # Immagini
+*.jpeg                   # Immagini
+*.png                    # Immagini
 # PyTorch specific
 *.pt                     # Modelli PyTorch salvati
 *.pth                    # File di checkpoint PyTorch
