@@ -12,6 +12,10 @@ from loggers import WandbLogger
 
 @dataclass
 class MainProblemOrchestrator:
+    """
+    This class handles the logic of the orchestrator. It is responsible for selecting the learners,
+    assigning the constraints to the learners, and updating the model.
+    """
     model : torch.nn.Module
     inequality_constraints: list
     equality_constraints: list
@@ -64,85 +68,41 @@ class MainProblemOrchestrator:
         self.current_model_idx += 1
         if len(self.teacher_history) > max_num_teachers:
             self.teacher_history = self.teacher_history[-max_num_teachers:]
-        """
-        if len(self.teacher_history) > max_num_teachers:
-            metrics = torch.tensor([config['metric'] for config in self.teacher_history])
-            sorted_metrics = torch.sort(metrics, descending=False)
-            indexes = sorted_metrics.indices[:max_num_teachers]
-            self.teacher_history = [self.teacher_history[i] for i in indexes]
-            if self.current_model_idx in indexes:
-                self.current_model_idx = indexes.tolist().index(self.current_model_idx)
-        """   
+
     def select_teacher_model(self):
   
         metrics = torch.tensor([config['metric'] for i,config in enumerate(self.teacher_history)])
-       
         tau=0.5
-        # Calcola le probabilità con la Distribuzione di Boltzmann (Softmax)
         probabilities = torch.nn.functional.softmax(-metrics / tau, dim=0)
-        print()
-        print('Teacher metrics:',metrics)
-        #print('Probabilities of selecting teachers:',probabilities)
-        # Seleziona un sottoproblema in base alla distribuzione
         selected= torch.multinomial(probabilities, num_samples=1).item()
-        #print('Selected teacher:',selected)
-        print()
         selected =-1
         return selected
     
     def compute_active_groups(self,selected_teacher_idx):
         tolerance = 0.05
-        delta_min = self.delta
-        delta_max = self.delta
-        delta_default = 0.30
         active_groups = {}
         
-        
-
         violations_dict = self.teacher_history[selected_teacher_idx]['violations_per_group']
-        print('Violations dict:',violations_dict)
+        
         for group_name, violations in violations_dict.items():
             active_groups[group_name] = []
             for idx,violation in violations.items():
                 if violation <= tolerance:
-                    if tolerance == 0:
-                        factor = 0
-                        active_groups[group_name].append({
-                            'group_id': idx,
-                            'delta': self.delta
-                        })
-                    else:
-                        factor = violation / tolerance
-                        sigmoid_factor =  (1 - torch.exp(-self.c * torch.tensor(violation))).item()
-                        delta = delta_min + (delta_max - delta_min) * factor
-                        active_groups[group_name].append({
-                            'group_id': idx,
-                            'delta': self.delta
-                        })
-                """
-                else: 
+                    
+                        
                     active_groups[group_name].append({
-                        'group_id': idx,
-                        'delta': delta_default
-                    })
-                """
+                            'group_id': idx,
+                            'delta': self.delta
+                     })
+                   
         active_groups_cpy = copy.deepcopy(active_groups)
         for group_name,group_list in active_groups_cpy.items():
             if len(group_list) == 0:
                 del active_groups[group_name]
 
-        """
-        active_groups = {}  
-        for group_name, violations in violations_dict.items():
-            active_groups[group_name] = []
-            for idx,violation in violations.items():
-                
-                active_groups[group_name].append({
-                        'group_id': idx,
-                        'delta': delta_min
-                    })
-        """
         self.active_groups = copy.deepcopy(active_groups) 
+
+
     def instanciate_subproblems(self,full_instance=True):
         if full_instance:
             self.eval_subproblem = self.build_subproblem(-1,eval_problem=True)
@@ -157,7 +117,7 @@ class MainProblemOrchestrator:
                 subproblem.set_alm()
             for subproblem in self.violation_subproblems.values():
                 subproblem.instanciate(self.model)
-            #subproblem.set_alm()
+ 
         
     
     def iterate(self,num_local_epochs=1,add_proximity_constraints=True,send_teacher_model=False):
@@ -172,30 +132,12 @@ class MainProblemOrchestrator:
             self.delta_step = self.delta
             self.delta_per_subproblem = {i:self.delta_min for i in range(self.num_subproblems)}
             self.is_eligible = {i:True for i in range(self.num_subproblems)}
-            #metrics = self.evaluate(self.model)
-            #self.update_teacher_history(self.model,metrics['val_constraints_score'],self.violations_dict)
             
-            
-            #self.assign_constraints(self.violations_dict,strategy='random')
-        
-        
-        #self.assign_constraints(self.violations_dict,strategy='dbscan')
-        #print('Original violations:',self.violations_dict)
-        #
-        #
-        #print('Constraints assignments:',self.constraints_assignment)
-        #print('Macro constraints:',self.macro_constraints)  
-        
-        #print(50*'-')
-        #for i in range(self.num_subproblems):
-        #    print('Subproblem',i,'violations:',self.violation_per_subproblem[i])
-        
-        #print('Original violations:',violations)
         selected = self.select_subproblem(c1=10)
        
-        #self.attempts[selected] += 1
+        
         problem = self.subproblems[selected]
-        #print('Active groups:',problem.instance.active_groups)
+       
         problem.reset()
         if problem.instance.group_cardinality is None:
             problem.instance.compute_groups_cardinality()
@@ -210,20 +152,7 @@ class MainProblemOrchestrator:
             print()
         num_epochs = num_local_epochs
         if send_teacher_model:
-            if not self.shock:
-                delta = self.delta_per_subproblem[selected]
-            else: 
-                if self.violation_per_subproblem[selected] > 0:
-                    delta = 0.5 
-                else: 
-                    delta = self.delta_per_subproblem[selected]
-            
-            if self.shock:
-                delta = self.delta
-                num_epochs = num_local_epochs
-            else: 
-                delta = self.delta
-                
+            delta = self.delta_per_subproblem[selected]
             print(50*'-')
             print(f'\nSelected subproblem {selected} with delta {delta} and violation (train) {self.violation_per_subproblem[selected]} (val) {self.val_violation_per_subproblem[selected]}')
             print(f'Max violation (train) {max_violation} (val) {max_violation_val}')
@@ -248,12 +177,7 @@ class MainProblemOrchestrator:
                                                                     delta,
                                                                     is_first)
                             is_first = False
-                """
-                else: 
-                    problem.add_global_proximity_constraint(i,
-                                                            self.delta,
-                                                            i==0)
-                """
+               
             problem.set_alm()
             
             teachers = [self.teacher_history[i]['model'] for i in range(len(self.teacher_history))]
@@ -296,7 +220,7 @@ class MainProblemOrchestrator:
         self.violations_dict = copy.deepcopy(new_violations_dict)
         self.val_violations_dict = copy.deepcopy(val_new_violations_dict)
         self.update_teacher_history(self.model,metrics['val_constraints_score'],self.violations_dict)
-        #self.active_groups = copy.deepcopy(problem.instance.active_groups)
+        
         for checkpoint in self.checkpoints:
             if isinstance(checkpoint, EarlyStopping):
                 stop, counter = checkpoint(metrics=metrics)
@@ -360,7 +284,6 @@ class MainProblemOrchestrator:
             num_subproblems = 0
             for macro_idx,macro_constraint in enumerate(self.macro_constraints):
                 if macro_idx not in self.shared_macro_contraints:
-                    #assignment = [random.randint(0, self.num_subproblems - 1) for _ in range(len(macro_constraint))]
                     for inequality_constraint_idx in macro_constraint:
                         current_constraint = self.inequality_constraints[inequality_constraint_idx]
                         if (current_constraint.group_name is not None) and  (current_constraint.group_name==group_name):
@@ -405,13 +328,11 @@ class MainProblemOrchestrator:
                     del constraints_per_subproblem[key]
         num_subproblems = 0
         
-        #print('Constraints per subproblem:',constraints_per_subproblem)
+        
         for problem_id,constraints in constraints_per_subproblem.items():
-            #print('Subproblem',problem_id,'number of constraints:',num_constraints_per_subproblem[problem_id])    
-            #print('Subproblem',problem_id,'constraints:',constraints)
+            
             if num_constraints_per_subproblem[problem_id] > self.max_constraints_in_subproblem:
                 n_new_problems = math.ceil(len(constraints) / self.max_constraints_in_subproblem)
-                #print('Subproblem',problem_id,'split into',n_new_problems,'problems')
                 idx = 0
                 for _ in range(n_new_problems):
                     current_constraints = constraints[idx:idx+self.max_constraints_in_subproblem]
@@ -430,7 +351,7 @@ class MainProblemOrchestrator:
                 num_subproblems += 1
        
         self.num_subproblems = num_subproblems
-        #print('New number of subproblems:',self.num_subproblems)
+       
         for macro_idx,macro_constraint in enumerate(self.macro_constraints):
             if macro_idx in self.shared_macro_contraints:
                 for inequality_constraint_idx in macro_constraint:
@@ -438,7 +359,7 @@ class MainProblemOrchestrator:
                         'to': [i for i in range(self.num_subproblems)],
                         'macro_constraint': macro_idx
                     }
-        #print('Assignments:',new_assignments)
+       
         return new_assignments
     
     def _set_violation_per_subproblem(self,violations_dict, val_violations_dict):
@@ -458,22 +379,15 @@ class MainProblemOrchestrator:
         
         return self.violation_per_subproblem,self.val_violation_per_subproblem
     
-    def assign_constraints(self,violations_dict={},strategy='dbscan'):
-        #random.randint(self.min_subproblems, self.max_subproblems)
-        if strategy == 'dbscan':
-            assert len(violations_dict) > 0, 'Violations dictionary must be provided for DBSCAN'
-            dbscan_assignment = self._assign_constraints_dbscan(violations_dict)
-            assignment = self._split_assignments(dbscan_assignment)
-        
-        else: 
-            group_assignment = self._group_assign_constraints()
-            assignment = self._split_assignments(group_assignment)
+    def assign_constraints(self,violations_dict={}):
+       
+        group_assignment = self._group_assign_constraints()
+        assignment = self._split_assignments(group_assignment)
         
         self.constraints_assignment['inequality_constraints']=assignment
         if len(violations_dict) > 0:
             self._set_violation_per_subproblem(violations_dict)
 
-      
     def build_subproblem(self,problem_id,eval_problem=False):
         
         if eval_problem:
@@ -584,8 +498,7 @@ class SubProblemConfig:
         
     def __post_init__(self):
         self.reset()
-        #self._compute_active_groups()
-
+       
     def reset(self):
         self.current_inequality_constraints = self.inequality_constraints
         self.current_macro_constraints = self.macro_constraints
@@ -653,6 +566,19 @@ class EarlyStoppingException(Exception):
 
 
 class OrchestratorWrapper(TorchNNWrapper):
+    """
+    Implementation of the orchestrator.
+
+    Methods:
+        fit(num_global_iterations=5, num_local_epochs=5, num_subproblems=5):
+            Fits the model using the specified number of global iterations, local epochs, and subproblems.
+            Args:
+                num_global_iterations (int): Number of global iterations. Default is 5.
+                num_local_epochs (int): Number of local epochs. Default is 5.
+                num_subproblems (int): Number of subproblems. Default is 5.
+            Returns:
+                The trained model.
+    """
     def __init__(self, *args,**kwargs):
         super(OrchestratorWrapper, self).__init__(*args, **kwargs)
         # Estrarre i parametri necessari da kwargs, con valori di default ove appropriato

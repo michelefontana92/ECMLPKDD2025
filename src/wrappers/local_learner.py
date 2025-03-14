@@ -14,7 +14,7 @@ class EarlyStoppingException(Exception):
 
 class LocalLearner(TorchNNWrapper):
     """
-    LocalLearner is a class that extends the TorchNNWrapper to implement a local learning algorithm with constraints.
+    LocalLearner is a class that implements a local learner with ALM optimization.
     Methods:
         compute_groups_cardinality(): Computes the cardinality of groups.
         _init_inequality_lambdas(): Initializes the inequality lambdas.
