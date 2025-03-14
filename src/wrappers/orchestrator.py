@@ -1,6 +1,5 @@
 import math
 import random
-from sklearn.cluster import DBSCAN, OPTICS
 import torch
 import numpy as np
 from wrappers import TorchNNWrapper,LocalLearner
@@ -8,7 +7,6 @@ from surrogates import SurrogateFactory
 from callbacks import EarlyStopping, ModelCheckpoint
 import copy
 from dataclasses import dataclass
-from functools import partial
 import os
 from loggers import WandbLogger
 
@@ -52,11 +50,7 @@ class MainProblemOrchestrator:
         self.current_model_idx = -1
         self.shock = False
         print('Main Problem Orchestrator initialized')
-        print('Number of subproblems:',self.num_subproblems)
-        #self.assign_constraints(strategy='dbscan')
-        #self.instanciate_subproblems(full_instance=False)
-        
-        
+     
     def update_teacher_history(self,teacher_model,metric,violations_dict):
         config = {
             'model': copy.deepcopy(teacher_model.state_dict()),
@@ -321,13 +315,11 @@ class MainProblemOrchestrator:
         for i in range(self.num_subproblems):
             current_violations=self.violation_subproblems[i].instance.compute_violations(val_kwargs)
             total_violations = 0 
-            #print('Subproblem',i,'violations:',current_violations)
             for key,value in current_violations['macro_constraints_violations'].items():
                 if key not in self.shared_macro_contraints:
                     if len(value)>0:
                         if value[0] > total_violations:
                             total_violations = value[0]
-                        #total_violations += value[0]
             final_violations.append(total_violations)
         
         final_violations = torch.tensor(final_violations)
@@ -339,8 +331,6 @@ class MainProblemOrchestrator:
 
         train_kwargs = self.eval_subproblem.instance.compute_val_kwargs(model.state_dict(),use_training=True)
         train_eval_subproblem_violations = self.eval_subproblem.instance.compute_violations(train_kwargs)
-
-        #subproblems_violations = self._compute_macro_constraints_violations_subproblems(val_kwargs)
         return eval_subproblem_violations,train_eval_subproblem_violations
     
     
@@ -381,9 +371,6 @@ class MainProblemOrchestrator:
                             num_subproblems = max(self.num_subproblems,max(inequality_constraints_assignment[inequality_constraint_idx]['to']))
             
             self.num_subproblems += num_subproblems +1
-        
-        
-        
         for macro_idx,macro_constraint in enumerate(self.macro_constraints):
             if macro_idx in self.shared_macro_contraints:
                 for inequality_constraint_idx in macro_constraint:
@@ -391,69 +378,10 @@ class MainProblemOrchestrator:
                         'to': [i for i in range(self.num_subproblems)],
                         'macro_constraint': macro_idx
                     }
-        #print('Number of subproblems:',self.num_subproblems)
-        #print('Group Assignments:',inequality_constraints_assignment)
-        
-        
         return inequality_constraints_assignment
     
-    def _assign_constraints_dbscan(self,violations_dict):
-        #print()
-        #print('Assigning constraints with DBSCAN')
-        #print('Violations:',violations_dict)
-        inequality_constraints_assignment = {}
-        constraint2idx = {}
-        self.min_samples=2
-        dbscan = OPTICS(min_samples=self.min_samples, min_cluster_size=self.min_samples)
-        
-        violations = []
-        #print('Macro constraints:',self.macro_constraints)
-        for macro_idx,macro_constraint in enumerate(self.macro_constraints):
-            if macro_idx not in self.shared_macro_contraints:
-                for inequality_constraint_idx in macro_constraint:
-                    violations.append(violations_dict['inequality_constraints_violations'][inequality_constraint_idx])
-                    constraint2idx[inequality_constraint_idx] = len(violations)-1
-        
-        #print('[DBSCAN] Violations:',violations)
-        violations = np.array(violations).reshape(-1,1)
-        #print('DBSCAN: violations:',violations)
 
-        dbscan_assignments = dbscan.fit_predict(violations)
-        self.num_subproblems = len(set(dbscan_assignments))
-        #print('DBSCAN Assignments:',dbscan_assignments)
-        dbscan_assignments = [a if a != -1 else self.num_subproblems-1 for a in dbscan_assignments]
-        
-        
-        assignments = [0 for _ in range(len(self.inequality_constraints))]
-        for macro_idx,macro_constraint in enumerate(self.macro_constraints):
-            if macro_idx in self.shared_macro_contraints:
-                for inequality_constraint_idx in macro_constraint:
-                    assignments[inequality_constraint_idx] = -1
-            else:
-                for inequality_constraint_idx in macro_constraint:
-                    assignments[inequality_constraint_idx] = dbscan_assignments[constraint2idx[inequality_constraint_idx]]
-        
-        #print('All Violations:',all_violations)
-        #print('After DBSCAN Assignments:',dbscan_assignments)
-        #print('DBSCAN Assignments:',assignments)
-        for macro_idx,macro_constraint in enumerate(self.macro_constraints):
-            if macro_idx in self.shared_macro_contraints:
-                for inequality_constraint_idx in macro_constraint:
-                    inequality_constraints_assignment[inequality_constraint_idx] = {
-                        'to': [i for i in range(self.num_subproblems)],
-                        'macro_constraint': macro_idx
-                    }
-            else:
-                for inequality_constraint_idx in macro_constraint:
-                    inequality_constraints_assignment[inequality_constraint_idx] = {
-                        'to': [assignments[inequality_constraint_idx]],
-                        'macro_constraint': macro_idx
-                    }
-        return inequality_constraints_assignment
-    
     def _split_assignments(self,assignment):
-        #print('\n\n\n\nInitial Assignment:',assignment)
-        #print('\n\n\n\n')
         new_assignments = copy.deepcopy(assignment)
         for key,value in new_assignments.items():
             value['to'] = []
@@ -536,10 +464,7 @@ class MainProblemOrchestrator:
             assert len(violations_dict) > 0, 'Violations dictionary must be provided for DBSCAN'
             dbscan_assignment = self._assign_constraints_dbscan(violations_dict)
             assignment = self._split_assignments(dbscan_assignment)
-            
-        elif strategy == 'random':
-            random_assignment = self._random_assign_constraints()
-            assignment = self._split_assignments(random_assignment)
+        
         else: 
             group_assignment = self._group_assign_constraints()
             assignment = self._split_assignments(group_assignment)
@@ -548,7 +473,7 @@ class MainProblemOrchestrator:
         if len(violations_dict) > 0:
             self._set_violation_per_subproblem(violations_dict)
 
-        #print('\n\n\n\nFinal Assignment: ',self.constraints_assignment)
+      
     def build_subproblem(self,problem_id,eval_problem=False):
         
         if eval_problem:
@@ -572,7 +497,6 @@ class MainProblemOrchestrator:
             sub_macro_constraints.append(list(range(num_constraints,num_constraints+len(constraints_indices))))
             num_constraints += len(constraints_indices)
         
-        #print('Subproblem',problem_id,'macro constraints indices:',sub_macro_constraints)    
         return SubProblemConfig(id=problem_id,
                          inequality_constraints=inequality_constraints,
                          equality_constraints=self.equality_constraints,
@@ -587,62 +511,34 @@ class MainProblemOrchestrator:
         return metrics
     
     def select_subproblem(self, c1=100.0, c2=1.0):
-        """
-        Seleziona un sottoproblema usando la distribuzione Beta.
+  
+       
+        violations_per_subproblem_tensor = torch.tensor([self.violation_per_subproblem[i] for i in range(self.num_subproblems)])
+        for i in range(self.num_subproblems):
+            if not self.is_eligible[i]:
+                violations_per_subproblem_tensor[i] = 0
             
-        Args:
-            violations (list or torch.Tensor): Violazioni correnti dei vincoli.
-            attempts (list or torch.Tensor): Numero di tentativi fatti per ciascun sottoproblema.
-            c1 (float): Peso per le violazioni.
-            c2 (float): Peso per i tentativi.
-
-        Returns:
-            int: Indice del sottoproblema selezionato.
-        """
-        epsilon = 0
-        shock = False
-        if shock:
-            eligible_subproblems = [i for i in range(self.num_subproblems) if self.violation_per_subproblem[i] == 0 and self.is_eligible[i]]
-            
+        alpha = torch.clamp(c1 * violations_per_subproblem_tensor, min=0)
+        tau=0.5
+           
+        if torch.sum(violations_per_subproblem_tensor) == 0:
+            eligible_subproblems = [i for i in range(self.num_subproblems) if self.is_eligible[i]] 
             if len(eligible_subproblems) > 0:
                 selected = random.choice(eligible_subproblems)
                 return selected
             else:
                 selected = torch.randint(0,self.num_subproblems,(1,)).item()
-            return selected
-        
-        else:
-            violations_per_subproblem_tensor = torch.tensor([self.violation_per_subproblem[i] for i in range(self.num_subproblems)])
-            for i in range(self.num_subproblems):
-                if not self.is_eligible[i]:
-                    violations_per_subproblem_tensor[i] = 0
-            #print('\n[SELECT SUBPROBLEM] Violation Dict Violations Tensor',self.violation_per_subproblem,violations_per_subproblem_tensor)
-            alpha = torch.clamp(c1 * violations_per_subproblem_tensor, min=epsilon)
-            tau=0.5
-            # Calcola le probabilità con la Distribuzione di Boltzmann (Softmax)
-            stop=False 
-            #print('Violations per subproblem:',violations_per_subproblem_tensor)
-        
-            if torch.sum(violations_per_subproblem_tensor) == 0:
-                eligible_subproblems = [i for i in range(self.num_subproblems) if self.is_eligible[i]] 
-                if len(eligible_subproblems) > 0:
-                    selected = random.choice(eligible_subproblems)
-                    return selected
-                else:
-                    selected = torch.randint(0,self.num_subproblems,(1,)).item()
                 return selected
             
-            probabilities = torch.nn.functional.softmax(alpha / tau, dim=0)
-            #print('Probabilities of selecting subproblems:',probabilities)
-        
-            # Seleziona un sottoproblema in base alla distribuzione
-            while not stop:
-                selected= torch.multinomial(probabilities, num_samples=1).item()
-                if violations_per_subproblem_tensor[selected] > 0:
-                    if self.is_eligible[selected]:
-                        stop = True
+        probabilities = torch.nn.functional.softmax(alpha / tau, dim=0)
+            
+        while not stop:
+            selected= torch.multinomial(probabilities, num_samples=1).item()
+            if violations_per_subproblem_tensor[selected] > 0:
+                if self.is_eligible[selected]:
+                    stop = True
                     
-            return selected
+        return selected
     
     def load_final_model(self):
         for checkpoint in self.checkpoints:
@@ -726,22 +622,6 @@ class SubProblemConfig:
         self.current_inequality_constraints.append(local_constraint)        
         self.current_num_constraints += 1
     
-    def add_global_proximity_constraint(self,teacher_idx,delta,new_macro_constraint):
-        global_constraint = SurrogateFactory.create(name=f'wasserstein', 
-                                             surrogate_name=f'wasserstein', 
-                                             surrogate_weight=1,  
-                                             group_name=None, 
-                                             use_local_distance=False,
-                                             lower_bound=delta, 
-                                             target_groups=None,
-                                             teacher_idx=teacher_idx)
-       
-        if new_macro_constraint:
-            self.current_macro_constraints.append([self.current_num_constraints])
-        else:
-            self.current_macro_constraints[-1].append(self.current_num_constraints)
-        self.current_inequality_constraints.append(global_constraint)
-        self.current_num_constraints += 1
     
     def set_alm(self):
         inequality_lambdas = self.instance.inequality_lambdas 
@@ -768,30 +648,13 @@ class SubProblemConfig:
         config['id'] = f'Subproblem {self.id}'
         self.instance = LocalLearner(model=copy.deepcopy(model),**config)
     
-   
-
-  
 class EarlyStoppingException(Exception):
     pass
 
 
 class OrchestratorWrapper(TorchNNWrapper):
     def __init__(self, *args,**kwargs):
-        """
-        Inizializza il wrapper gerarchico per suddividere e risolvere vincoli in sottoproblemi.
-
-        Args:
-            **kwargs: Parametri addizionali, tra cui:
-                - model: Il modello da ottimizzare.
-                - inequality_constraints: Lista di vincoli di disuguaglianza da suddividere.
-                - macro_constraints_list: Lista di macro constraints (ogni elemento è una lista di indici dei vincoli).
-                - target_groups: Lista di identificatori di gruppi su cui suddividere i vincoli.
-                - min_subproblems (int): Numero minimo di sottoproblemi da generare. Default: 1.
-                - max_subproblems (int): Numero massimo di sottoproblemi da generare. Default: 5.
-                - optimizer_fn, objective_function, original_objective_fn, equality_constraints, metrics,
-                  num_epochs, logger, training_group_name, lagrangian_checkpoints, callbacks.
-        """
-        super(TorchNNHierarchicalLagrangianWrapper, self).__init__(*args, **kwargs)
+        super(OrchestratorWrapper, self).__init__(*args, **kwargs)
         # Estrarre i parametri necessari da kwargs, con valori di default ove appropriato
         self.loss_fn = kwargs.get('loss')
         self.inequality_constraints = kwargs.get("inequality_constraints", [])
@@ -801,7 +664,7 @@ class OrchestratorWrapper(TorchNNWrapper):
         self.max_subproblems = kwargs.get("max_subproblems", 5)
         self.all_group_ids = kwargs.get("all_group_ids")
         assert self.all_group_ids is not None, 'all_group_ids must be provided'
-        # Parametri addizionali per configurare il sottoproblema
+        
         self.optimizer_fn: callable = kwargs.get('optimizer_fn')
         self.objective_function = kwargs.get("objective_function")
         self.original_objective_fn = kwargs.get("original_objective_fn")
@@ -810,11 +673,11 @@ class OrchestratorWrapper(TorchNNWrapper):
         self.num_epochs = kwargs.get("num_epochs", 10)
         self.logger = kwargs.get("logger")
         self.lagrangian_checkpoints = kwargs.get("lagrangian_checkpoints", [])
-        #print('Number of Lagrangian checkpoints:',len(self.lagrangian_checkpoints))
+        
         self.checkpoints = kwargs.get("checkpoints")
         self.checkpoints_config = kwargs.get("checkpoints_config")
         self.delta = kwargs.get("delta")
-        # Copia del modello per gestione della distillazione
+       
         self.current_model = self.model
         self.shared_macro_constraints = kwargs.get("shared_macro_constraints",[])
         self.max_constraints_in_subproblem = kwargs.get("max_constraints_in_subproblem",5)
@@ -838,12 +701,6 @@ class OrchestratorWrapper(TorchNNWrapper):
         
    
     def fit(self, num_global_iterations=5,num_local_epochs=5,num_subproblems=5):
-        """
-        Risolve il problema di fairness intersezionale tramite ottimizzazione iterativa con checkpoint per early stopping.
-
-        Args:
-            num_global_iterations: Numero massimo di iterazioni.
-        """
         main_problem = MainProblemOrchestrator(
                                             model=copy.deepcopy(self.model),
                                             inequality_constraints=self.inequality_constraints,

@@ -28,23 +28,23 @@ class CentralizedCompasRun(BaseRun):
                                                              ]}
                                                 ),
                                                 ('Gender',{'sex':['Male','Female']}),
-                                                ('AgeCat',{'age_cat':['Greater than 45','25 - 45','Less than 25']}),
+                                                ('Age',{'age_cat':['Greater than 45','25 - 45','Less than 25']}),
                                                 ('GenderRace',{
                                                     'race':['Other', 'African-American', 
                                                              'Caucasian'  
                                                              ],
                                                     'sex':['Male','Female']
                                                 }),
-                                                ('GenderAgeCat',{
+                                                ('GenderAge',{
                                                     'age_cat':['Greater than 45','25 - 45','Less than 25'],
                                                     'sex':['Male','Female']
                                                 }),
-                                                ('RaceAgeCat',{
+                                                ('RaceAge',{
                                                     'age_cat':['Greater than 45','25 - 45','Less than 25'],
                                                     'race':['Other', 'African-American', 
                                                              'Caucasian' ]
                                                 }),
-                                                ('GenderRaceAgeCat',{
+                                                ('GenderRaceAge',{
                                                     'age_cat':['Greater than 45','25 - 45','Less than 25'],
                                                     'race':['Other', 'African-American', 
                                                              'Caucasian'  

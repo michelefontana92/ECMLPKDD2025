@@ -1,4 +1,4 @@
-# FairLAB
+# FairLAB (Fairness via Lagrangian Augmented with a performance Budget)
 <p align="center">
 <img src="method.jpg" alt="Method sketch" width="600">
 </p>
@@ -28,7 +28,7 @@ git clone https://anonymous.4open.science/r/ECMLPKDD2025-016B/
 
 ### **4. Navigate to the project directory**
 ```bash
-cd FairLab
+cd ECMLPKDD2025-016B
 ```
 
 ### **5. Install dependencies**
@@ -60,14 +60,45 @@ The project follows this structure:
     ├── runs
     ├── surrogates
     └── wrappers
+        ├── orchestrator.py
+        └── learner.py
+        
 ```
 
 - **`data/`** → Contains the datasets used in experiments.
 - **`src/`** → Contains the core implementation of FairLab.
 
 ---
+## **Experimental Setting**
+In this section, we provide details about the experimental setting.
+
+### **Sensitive Attributes**
+In the experiments we consider the following sensitive attributes:
+- `FolkTables`: 
+  - `Job` : {Public Employee,Self Employed,Private Employee}
+  - `Race` : {White, Black,Asian,Other,Indigenous}
+  - `Marital Status` : {Married,Never Married,Divorced,Other}
+- `Compas`: 
+  - `Gender` : {Male, Female}
+  - `Race` : {African-American,Caucasian,Other}
+  - `Age` : {Less than 25, 25 - 45, Greater than 45}
+- `MEPS`: 
+  - `Gender` : {Male, Female}
+  - `Race` : {Hispanic,Black,White,Other}
+  - `Marital Status` : {Married,Never Married,Other}
+
+### **Neural Networks**
+
+Across all datasets, we train a feedforward neural network with two hidden layers containing $300$ and $100$ neurons, respectively, and ReLU activations. A Dropout layer with a rate of $0.2$ is applied after the last hidden layer for regularization, while the output layer uses the Softmax function.
+
+### **Hyper-parameters**
+
+Regarding training, we train the neural network for a maximum of $100$ iterations at the orchestrator level and up to $30$ epochs per learner. Early stopping is applied with a patience of $5$ epochs at both levels, based on the scoring functions *S* and *LS*, respectively. At the learner level, we employ the Adam optimizer with a learning rate of $1e^{-4}$, a weight decay factor of $1e^{-4}$, and a batch size of $128$. The loss function is the Cross-Entropy, and the fairness threshold is set to $\tau = 0.2$.
+
+---
 
 ## **Usage**
+
 To run an experiment with `FairLab`:
 
 ### **1. Navigate to the `src` directory**
@@ -83,15 +114,15 @@ python main.py --options
 ### **Available Options**
 ```bash
 Options:
-  -r, --run TEXT              Name of the run to execute
-  -p, --project_name TEXT     Name of the WandB project
-  -ml, --metrics_list TEXT    List of fairness metrics
-  -gl, --groups_list TEXT     List of sensitive groups
-  -tl, --threshold_list FLOAT Threshold values for fairness constraints
-  -d, --delta FLOAT      Value of the proximity threshold (default = 0.02)
-  -ds --delta_step FLOAT Value of delta_step parameter (default = 0.01)
-  -dt --delta_tol FLOAT   Value of the tolerance threshold (default = 0.05)
-  -pb --performance_budget  FLOAT Value of the performance budget (default = 0.05)
+  -r, --run TEXT                  Name of the run to execute
+  -p, --project_name TEXT         Name of the WandB project
+  -ml, --metrics_list TEXT        List of fairness metrics
+  -gl, --groups_list TEXT         List of sensitive groups
+  -tl, --threshold_list FLOAT     Threshold values for fairness constraints
+  -d, --delta FLOAT               Value of the proximity threshold (default = 0.02)
+  -rs --rho_step FLOAT            Value of performance step parameter (default = 0.01)
+  -nt --nu_tol FLOAT              Value of the tolerance threshold (default = 0.05)
+  -pb --performance_budget FLOAT  Value of the performance budget (default = 0.05)
 ```
 
 #### **Predefined Runs (`runs` folder)**
@@ -106,7 +137,14 @@ The code supports the following **fairness metrics**:
 - `equalized_odds`
 
 ---
+## **Available Groups**
+In this work, we consider the following groups, corresponding to the single or intersectional attributes used in our experiments.
 
+- For `FolkTables`: {`Job`,`Race`,`Marital`,`JobRace`,`JobMarital`,`RaceMarital`,`JobRaceMarital`}
+- For `Compas`: {`Gender`,`Race`,`Age`,`GenderRace`,`GenderAge`,`RaceAge`,`GenderRaceAge`}
+- For `MEPS`: {`Gender`,`Race`,`Marital`,`GenderRace`,`GenderMarital`,`RaceMarital`,`GenderRaceMarital`}
+
+---
 ## **Logging**
 The code uses **Weights & Biases (WandB)** for experiment tracking. 
 To use it:

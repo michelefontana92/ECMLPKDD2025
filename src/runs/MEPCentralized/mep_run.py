@@ -23,11 +23,9 @@ class CentralizedMEPRun(BaseRun):
         race_values = ['Hispanic','Black','White','Other']
         marry_values = ['Married','Never Married','Other']
         gender_values = ['Male','Female']
-        region_values = ['Midwest', 'Northeast', 'South', 'West']
         race_var = 'RACE'
         gender_var = 'SEX'
         marry_var = 'MARRY'
-        region_var = 'REGION'
         self.sensitive_attributes = kwargs.get('sensitive_attributes',
                                                [
                                                 ('Race',
@@ -36,32 +34,21 @@ class CentralizedMEPRun(BaseRun):
                                                 ('Gender',
                                                  {gender_var:gender_values}
                                                  ),
-                                                 ('Region',
-                                                 {region_var:region_values}
-                                                 ),
-                                                 ('Marriage',
+                                                 ('Marital',
                                                   {marry_var:marry_values}),
                                                 ('GenderRace',
                                                  {gender_var:gender_values,
                                                   race_var:race_values}),
-                                                ('GenderMarriage',
+                                                ('GenderMarital',
                                                  {gender_var:gender_values,
                                                   marry_var:marry_values}),
-                                                ('RaceMarriage',
+                                                ('RaceMarital',
                                                  {marry_var:marry_values,
                                                   race_var:race_values}),
-                                                ('GenderRaceMarriage',
+                                                ('GenderRaceMarital',
                                                  {gender_var:gender_values,
                                                   marry_var:marry_values,
-                                                  race_var:race_values}),
-                                                
-                                                 ('GenderRaceMarriageRegion',
-                                                 {gender_var:gender_values,
-                                                  marry_var:marry_values,
-                                                  race_var:race_values,
-                                                  region_var:region_values}),
-
-                                               
+                                                  race_var:race_values})
                                                 ])
         
         
